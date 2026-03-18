@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, CSSProperties, FocusEvent, MouseEvent, useRef } from "react";
+import Link from "next/link";
 import { 
   Plus, 
   Home, 
@@ -340,6 +341,20 @@ export default function App() {
     }
   };
 
+  const clearAllLogs = async (): Promise<void> => {
+    if (!confirm("Are you sure you want to clear all logs?")) return;
+    try {
+      await fetch("/api/food", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      setLog([]);
+    } catch (err) {
+      console.error("Failed to clear logs:", err);
+    }
+  };
+
   const totals = log.reduce(
     (acc, e) => ({
       calories: acc.calories + e.calories,
@@ -470,7 +485,10 @@ export default function App() {
       <div style={{ padding: "20px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1e293b", margin: 0 }}>Daily Log</h2>
-          <button style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>View All</button>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link href="/logs" style={{ color: "#6366f1", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>View All</Link>
+            <button onClick={clearAllLogs} style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear All</button>
+          </div>
         </div>
 
         {log.length === 0 ? (
