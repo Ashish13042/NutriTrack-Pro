@@ -96,7 +96,7 @@ const MACROS: MacroInfo[] = [
   { key: "fat",      label: "Fat",      unit: "g",    color: "#ec4899", bg: "#fdf2f8", icon: <Droplets size={14} /> },
 ];
 
-const DAILY_REF: Record<string, number> = { calories: 2000, protein: 50, carbs: 275, fat: 78 };
+const DAILY_REF: Record<string, number> = { calories: 2000, protein_base: 1.6, carbs: 250, fat: 78 };
 
 // ── Shared style helpers ────────────────────────────────────────────────────
 const INPUT_STYLE: CSSProperties = {
@@ -124,10 +124,24 @@ function focusOut(e: FocusEvent<HTMLInputElement | HTMLSelectElement>): void {
 }
 
 // ── Circular Progress Component ──────────────────────────────────────────────
-function CircularProgress({ value, total, label }: { value: number; total: number; label: string }) {
+function CircularProgress({ 
+  value, 
+  total, 
+  label, 
+  size = "lg", 
+  color = "#f97316",
+  unit = "g"
+}: { 
+  value: number; 
+  total: number; 
+  label: string; 
+  size?: "sm" | "lg";
+  color?: string;
+  unit?: string;
+}) {
   const percent = Math.min((value / total) * 100, 100);
-  const stroke = 8;
-  const radius = 70;
+  const stroke = size === "lg" ? 8 : 5;
+  const radius = size === "lg" ? 65 : 45; // Slightly larger small circle for better text fit
   const normalizedRadius = radius - stroke * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (percent / 100) * circumference;
@@ -144,7 +158,7 @@ function CircularProgress({ value, total, label }: { value: number; total: numbe
           cy={radius}
         />
         <circle
-          stroke="#f97316"
+          stroke={color}
           fill="transparent"
           strokeWidth={stroke}
           strokeDasharray={circumference + " " + circumference}
@@ -155,9 +169,16 @@ function CircularProgress({ value, total, label }: { value: number; total: numbe
           cy={radius}
         />
       </svg>
-      <div style={{ position: "absolute", textAlign: "center" }}>
-        <p style={{ fontSize: 28, fontWeight: 800, color: "#1e293b", margin: 0 }}>{Math.max(0, total - value).toFixed(0)}</p>
-        <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{label}</p>
+      <div style={{ position: "absolute", textAlign: "center", width: "100%", padding: "0 10px", boxSizing: "border-box" }}>
+        <p style={{ fontSize: size === "lg" ? 22 : 14, fontWeight: 800, color: "#1e293b", margin: 0, lineHeight: 1.1 }}>
+          {percent.toFixed(0)}%
+        </p>
+        <p style={{ fontSize: size === "lg" ? 9 : 8, color: "#64748b", margin: "2px 0", fontWeight: 700, textTransform: "uppercase" }}>
+          {label}
+        </p>
+        <p style={{ fontSize: size === "lg" ? 8 : 7, color: "#94a3b8", margin: 0, fontWeight: 500 }}>
+          {value.toFixed(0)} / {total.toFixed(0)}{unit}
+        </p>
       </div>
     </div>
   );
@@ -170,7 +191,7 @@ export default function App() {
   const [unit, setUnit]               = useState<string>("g");
   const [result, setResult]           = useState<LogEntry | null>(null);
   const [log, setLog]                 = useState<LogEntry[]>([]);
-  const [weight, setWeight]           = useState<string>("");
+  const [weight, setWeight]           = useState<string>("70");
   const [editIndex, setEditIndex]     = useState<number | null>(null);
   const [error, setError]             = useState<string>("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -329,13 +350,17 @@ export default function App() {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  const proteinGoal = weight ? parseFloat(weight) * 1.6 : 0;
-  const unitList = getUnits();
+  const bodyWeightNum = parseFloat(weight) || 70;
+  const proteinGoal = bodyWeightNum * DAILY_REF.protein_base;
+  const carbsGoal = DAILY_REF.carbs;
+  const caloriesGoal = DAILY_REF.calories;
 
   const getFormattedTime = (timestamp?: number) => {
     const date = timestamp ? new Date(timestamp) : new Date();
     return `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
   };
+
+  const unitList = getUnits();
 
   return (
     <div style={{
@@ -352,7 +377,7 @@ export default function App() {
       {/* ── Top Tabs ── */}
       <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "20px 16px 10px" }}>
         {(["today", "weekly", "monthly"] as const).map(tab => (
-          <button 
+          <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
@@ -374,68 +399,64 @@ export default function App() {
       </div>
 
       {/* ── Dashboard Card ── */}
-      <div style={{ padding: "10px 20px" }}>
+      <div style={{ padding: "10px 16px" }}>
         <div style={{
           background: "#fff",
           borderRadius: 24,
-          padding: 24,
+          padding: "20px 16px",
           boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
           border: "1px solid #f1f5f9",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 20
+          gap: 16
         }}>
           <div style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ textAlign: "center", flex: 1 }}>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.protein.toFixed(0)}</p>
-              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>Protein</p>
-            </div>
             
-            <CircularProgress value={totals.calories} total={DAILY_REF.calories} label="Remaining" />
+            <CircularProgress value={totals.protein} total={proteinGoal} label="Protein" size="sm" color="#6366f1" unit="g" />
 
-            <div style={{ textAlign: "center", flex: 1 }}>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.carbs.toFixed(0)}</p>
-              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>Carbs</p>
-            </div>
+            <CircularProgress value={totals.calories} total={caloriesGoal} label="Calories" size="lg" color="#f97316" unit="kcal" />
+
+            <CircularProgress value={totals.carbs} total={carbsGoal} label="Carbs" size="sm" color="#10b981" unit="g" />
+
           </div>
 
           <div style={{ width: "100%", height: 1.5, background: "#f1f5f9" }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", width: "100%", gap: 20 }}>
-             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", color: "#f59e0b" }}>
-                  <Flame size={18} />
-                </div>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.calories.toFixed(0)}</p>
-                  <p style={{ fontSize: 10, color: "#94a3b8", margin: 0 }}>Calories burned</p>
-                </div>
-             </div>
-             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fdf2f8", display: "flex", alignItems: "center", justifyContent: "center", color: "#ec4899" }}>
-                  <Droplets size={18} />
-                </div>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.fat.toFixed(0)}</p>
-                  <p style={{ fontSize: 10, color: "#94a3b8", margin: 0 }}>Fat consumed</p>
-                </div>
-             </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", width: "100%", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", padding: 10, borderRadius: 16 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", color: "#f59e0b" }}>
+                <Flame size={18} />
+              </div>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.calories.toFixed(0)}</p>
+                <p style={{ fontSize: 9, color: "#94a3b8", margin: 0, fontWeight: 600 }}>Burned</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", padding: 10, borderRadius: 16 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fdf2f8", display: "flex", alignItems: "center", justifyContent: "center", color: "#ec4899" }}>
+                <Droplets size={18} />
+              </div>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.fat.toFixed(1)}g</p>
+                <p style={{ fontSize: 9, color: "#94a3b8", margin: 0, fontWeight: 600 }}>Total Fat</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Body Weight Quick Settings ── */}
-      <div style={{ padding: "0 20px", marginTop: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px 16px", borderRadius: 16 }}>
+      <div style={{ padding: "0 16px", marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px 16px", borderRadius: 16, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18 }}>⚖️</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Body Weight</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <input 
-              type="number" 
-              value={weight} 
+            <input
+              type="number"
+              value={weight}
               onChange={e => setWeight(e.target.value)}
               placeholder="0"
               style={{ width: 40, background: "transparent", border: "none", textAlign: "right", fontWeight: 700, fontSize: 14, color: "#6366f1", outline: "none" }}
@@ -446,7 +467,7 @@ export default function App() {
       </div>
 
       {/* ── Food Log Timeline ── */}
-      <div style={{ padding: "24px 20px" }}>
+      <div style={{ padding: "20px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1e293b", margin: 0 }}>Daily Log</h2>
           <button style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>View All</button>
@@ -459,18 +480,18 @@ export default function App() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {log.map((entry, i) => (
-              <div key={i} style={{ display: "flex", gap: 16 }}>
+              <div key={i} style={{ display: "flex", gap: 12 }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 40 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8" }}>{getFormattedTime(entry.timestamp)}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8" }}>{getFormattedTime(entry.timestamp)}</span>
                   <div style={{ flex: 1, width: 2, background: i === log.length - 1 ? "transparent" : "#f1f5f9", margin: "4px 0" }} />
                 </div>
-                
-                <div style={{ 
-                  flex: 1, 
-                  background: "#f8fafc", 
-                  borderRadius: 16, 
-                  padding: "12px 16px", 
-                  marginBottom: 16,
+
+                <div style={{
+                  flex: 1,
+                  background: "#f8fafc",
+                  borderRadius: 20,
+                  padding: "12px 16px",
+                  marginBottom: 12,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -484,11 +505,11 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 2 }}>
-                    <button onClick={() => editItem(i)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 6 }}>
-                      <Edit3 size={16} />
+                    <button onClick={() => editItem(i)} style={{ background: "#fff", border: "none", color: "#94a3b8", borderRadius: 8, padding: 6, cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
+                      <Edit3 size={14} />
                     </button>
-                    <button onClick={() => removeItem(i)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: 6 }}>
-                      <Trash2 size={16} />
+                    <button onClick={() => removeItem(i)} style={{ background: "#fef2f2", border: "none", color: "#ef4444", borderRadius: 8, padding: 6, cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -500,7 +521,7 @@ export default function App() {
 
       {/* ── Add Food Form (Conditional Overlay) ── */}
       {showAddForm && (
-        <div 
+        <div
           ref={addFormRef}
           style={{
             position: "fixed",
@@ -511,8 +532,8 @@ export default function App() {
             maxWidth: 420,
             background: "#fff",
             zIndex: 200,
-            borderTopLeftRadius: 30,
-            borderTopRightRadius: 30,
+            borderTopLeftRadius: 32,
+            borderTopRightRadius: 32,
             padding: 24,
             boxShadow: "0 -10px 40px rgba(0,0,0,0.1)",
             animation: "slideUp 0.3s ease-out"
@@ -520,16 +541,15 @@ export default function App() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{editIndex !== null ? "Edit Item" : "Add Food"}</h3>
-            <button 
+            <button
               onClick={() => { setShowAddForm(false); setEditIndex(null); setFood(""); setQuantity(""); setResult(null); }}
-              style={{ background: "#f1f5f9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              style={{ background: "#f1f5f9", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
             >
               <Plus size={18} style={{ transform: "rotate(45deg)", color: "#64748b" }} />
             </button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Food Name */}
             <div style={{ position: "relative" }}>
               <Search size={16} style={{ position: "absolute", left: 14, top: 16, color: "#94a3b8" }} />
               <input
@@ -543,17 +563,16 @@ export default function App() {
               />
               {suggestions.length > 0 && (
                 <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", zIndex: 10, boxShadow: "0 -4px 12px rgba(0,0,0,0.05)", marginBottom: 8 }}>
-                   {suggestions.map(s => (
-                     <div key={s} onClick={() => selectSuggestion(s)} style={{ padding: "10px 14px", fontSize: 14, cursor: "pointer", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
-                        <span>{FOOD_DB[s].emoji} {s}</span>
-                        <ChevronRight size={14} color="#94a3b8" />
-                     </div>
-                   ))}
+                  {suggestions.map(s => (
+                    <div key={s} onClick={() => selectSuggestion(s)} style={{ padding: "12px 14px", fontSize: 14, cursor: "pointer", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
+                      <span>{FOOD_DB[s].emoji} {s}</span>
+                      <ChevronRight size={14} color="#94a3b8" />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Quantity Row */}
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 type="number"
@@ -566,7 +585,7 @@ export default function App() {
               />
               {unitList.length > 0 && (
                 <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...INPUT_STYLE, flex: 1 }}>
-                  {unitList.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                  {unitList.map((u: UnitOption) => <option key={u.label} value={u.label}>{u.label}</option>)}
                 </select>
               )}
             </div>
@@ -575,20 +594,20 @@ export default function App() {
 
             {/* Preview Results if any */}
             {result && (
-               <div style={{ background: "#f0f4ff", padding: 12, borderRadius: 12, display: "flex", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>Preview: {result.calories.toFixed(0)} kcal</div>
-                  <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>P: {result.protein.toFixed(1)}g</div>
-               </div>
+              <div style={{ background: "#f0f4ff", padding: 12, borderRadius: 12, display: "flex", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>Preview: {result.calories.toFixed(0)} kcal</div>
+                <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>P: {result.protein.toFixed(1)}g</div>
+              </div>
             )}
 
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button 
+              <button
                 onClick={handleCalculate}
                 style={{ flex: 1, padding: 14, borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontWeight: 700, cursor: "pointer" }}
               >
                 Preview
               </button>
-              <button 
+              <button
                 onClick={addOrUpdate}
                 style={{ flex: 1, padding: 14, borderRadius: 12, border: "none", background: "#f97316", color: "#fff", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(249,115,22,0.3)" }}
               >
@@ -625,7 +644,7 @@ export default function App() {
         </div>
 
         {/* Floating Action Button */}
-        <button 
+        <button
           onClick={() => setShowAddForm(true)}
           style={{
             position: "absolute",
