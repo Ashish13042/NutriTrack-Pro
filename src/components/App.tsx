@@ -1,21 +1,20 @@
 "use client";
 
-import { useState, useEffect, CSSProperties, FocusEvent, MouseEvent, useRef } from "react";
+import { useState, useEffect, CSSProperties, FocusEvent, useRef } from "react";
 import Link from "next/link";
-import { 
-  Plus, 
-  Home, 
-  Utensils, 
-  BarChart2, 
-  User, 
-  Search, 
-  Trash2, 
-  Edit3, 
+import {
+  Plus,
+  Home,
+  Utensils,
+  BarChart2,
+  Search,
+  Trash2,
+  Edit3,
   ChevronRight,
   Flame,
   Dumbbell,
   Zap,
-  Droplets
+  Droplets,User
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -34,15 +33,6 @@ interface UnitOption {
   multiplier: number;
 }
 
-interface MacroInfo {
-  key: "calories" | "protein" | "carbs" | "fat";
-  label: string;
-  unit: string;
-  color: string;
-  bg: string;
-  icon: React.ReactNode;
-}
-
 interface LogEntry {
   id?: number;
   calories: number;
@@ -57,44 +47,42 @@ interface LogEntry {
 }
 
 // ── Food Database ───────────────────────────────────────────────────────────
+// NOTE: Weight and Volume are per 100g/100ml. Units are per 1 item.
 const FOOD_DB: Record<string, FoodItem> = {
-  chicken:      { calories: 165, protein: 31,   carbs: 0,    fat: 3.6,  emoji: "🍗", category: "Protein", type: "weight" },
-  egg:          { calories: 78,  protein: 6,    carbs: 0.6,  fat: 5,    emoji: "🥚", category: "Protein", type: "unit"   },
-  tuna:         { calories: 116, protein: 26,   carbs: 0,    fat: 1,    emoji: "🐟", category: "Protein", type: "weight" },
-  salmon:       { calories: 208, protein: 20,   carbs: 0,    fat: 13,   emoji: "🐠", category: "Protein", type: "weight" },
-  beef:         { calories: 250, protein: 26,   carbs: 0,    fat: 15,   emoji: "🥩", category: "Protein", type: "weight" },
-  paneer:       { calories: 265, protein: 18,   carbs: 3.4,  fat: 20,   emoji: "🧀", category: "Protein", type: "weight" },
-  rice:         { calories: 130, protein: 2.7,  carbs: 28,   fat: 0.3,  emoji: "🍚", category: "Carbs",   type: "weight" },
-  bread:        { calories: 80,  protein: 3,    carbs: 15,   fat: 1,    emoji: "🍞", category: "Carbs",   type: "unit"   },
-  oats:         { calories: 389, protein: 17,   carbs: 66,   fat: 7,    emoji: "🌾", category: "Carbs",   type: "weight" },
-  pasta:        { calories: 131, protein: 5,    carbs: 25,   fat: 1.1,  emoji: "🍝", category: "Carbs",   type: "weight" },
-  banana:       { calories: 89,  protein: 1.1,  carbs: 23,   fat: 0.3,  emoji: "🍌", category: "Carbs",   type: "unit"   },
-  roti:         { calories: 104, protein: 3,    carbs: 18,   fat: 3.5,  emoji: "🫓", category: "Carbs",   type: "unit"   },
-  milk:         { calories: 42,  protein: 3.4,  carbs: 5,    fat: 1,    emoji: "🥛", category: "Dairy",   type: "volume" },
-  yogurt:       { calories: 59,  protein: 10,   carbs: 3.6,  fat: 0.4,  emoji: "🍦", category: "Dairy",   type: "weight" },
-  almonds:      { calories: 579, protein: 21,   carbs: 22,   fat: 50,   emoji: "🌰", category: "Fats",    type: "weight" },
-  avocado:      { calories: 160, protein: 2,    carbs: 9,    fat: 15,   emoji: "🥑", category: "Fats",    type: "unit"   },
-  peanutbutter: { calories: 588, protein: 25,   carbs: 20,   fat: 50,   emoji: "🥜", category: "Fats",    type: "weight" },
-  spinach:      { calories: 23,  protein: 2.9,  carbs: 3.6,  fat: 0.4,  emoji: "🥬", category: "Veggies", type: "weight" },
-  broccoli:     { calories: 34,  protein: 2.8,  carbs: 7,    fat: 0.4,  emoji: "🥦", category: "Veggies", type: "weight" },
-  apple:        { calories: 52,  protein: 0.3,  carbs: 14,   fat: 0.2,  emoji: "🍎", category: "Fruit",   type: "unit"   },
+  chicken: { calories: 165, protein: 31, carbs: 0, fat: 3.6, emoji: "🍗", category: "Protein", type: "weight" },
+  egg: { calories: 78, protein: 6, carbs: 0.6, fat: 5, emoji: "🥚", category: "Protein", type: "unit" },
+  tuna: { calories: 116, protein: 26, carbs: 0, fat: 1, emoji: "🐟", category: "Protein", type: "weight" },
+  salmon: { calories: 208, protein: 20, carbs: 0, fat: 13, emoji: "🐠", category: "Protein", type: "weight" },
+  beef: { calories: 250, protein: 26, carbs: 0, fat: 15, emoji: "🥩", category: "Protein", type: "weight" },
+  paneer: { calories: 265, protein: 18, carbs: 3.4, fat: 20, emoji: "🧀", category: "Protein", type: "weight" },
+  rice: { calories: 130, protein: 2.7, carbs: 28, fat: 0.3, emoji: "🍚", category: "Carbs", type: "weight" },
+  bread: { calories: 80, protein: 3, carbs: 15, fat: 1, emoji: "🍞", category: "Carbs", type: "unit" },
+  oats: { calories: 389, protein: 17, carbs: 66, fat: 7, emoji: "🌾", category: "Carbs", type: "weight" },
+  pasta: { calories: 131, protein: 5, carbs: 25, fat: 1.1, emoji: "🍝", category: "Carbs", type: "weight" },
+  banana: { calories: 89, protein: 1.1, carbs: 23, fat: 0.3, emoji: "🍌", category: "Carbs", type: "unit" },
+  roti: { calories: 104, protein: 3, carbs: 18, fat: 3.5, emoji: "🫓", category: "Carbs", type: "unit" },
+  milk: { calories: 42, protein: 3.4, carbs: 5, fat: 1, emoji: "🥛", category: "Dairy", type: "volume" },
+  yogurt: { calories: 59, protein: 10, carbs: 3.6, fat: 0.4, emoji: "🍦", category: "Dairy", type: "weight" },
+  almonds: { calories: 579, protein: 21, carbs: 22, fat: 50, emoji: "🌰", category: "Fats", type: "weight" },
+  avocado: { calories: 160, protein: 2, carbs: 9, fat: 15, emoji: "🥑", category: "Fats", type: "unit" },
+  peanutbutter: { calories: 588, protein: 25, carbs: 20, fat: 50, emoji: "🥜", category: "Fats", type: "weight" },
+  spinach: { calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4, emoji: "🥬", category: "Veggies", type: "weight" },
+  broccoli: { calories: 34, protein: 2.8, carbs: 7, fat: 0.4, emoji: "🥦", category: "Veggies", type: "weight" },
+  apple: { calories: 52, protein: 0.3, carbs: 14, fat: 0.2, emoji: "🍎", category: "Fruit", type: "unit" },
 };
 
 const WEIGHT_UNITS: UnitOption[] = [
-  { label: "g",  multiplier: 1 / 100 },
+  { label: "g", multiplier: 1 / 100 },
   { label: "kg", multiplier: 10 },
 ];
 
 const VOLUME_UNITS: UnitOption[] = [
-  { label: "ml",    multiplier: 1 / 100 },
+  { label: "ml", multiplier: 1 / 100 },
   { label: "litre", multiplier: 10 },
 ];
 
-const MACROS: MacroInfo[] = [
-  { key: "calories", label: "Calories", unit: "kcal", color: "#f59e0b", bg: "#fffbeb", icon: <Flame size={14} /> },
-  { key: "protein",  label: "Protein",  unit: "g",    color: "#6366f1", bg: "#eef2ff", icon: <Dumbbell size={14} /> },
-  { key: "carbs",    label: "Carbs",    unit: "g",    color: "#10b981", bg: "#ecfdf5", icon: <Zap size={14} /> },
-  { key: "fat",      label: "Fat",      unit: "g",    color: "#ec4899", bg: "#fdf2f8", icon: <Droplets size={14} /> },
+const ITEM_UNITS: UnitOption[] = [
+  { label: "Qty", multiplier: 1 }
 ];
 
 const DAILY_REF: Record<string, number> = { calories: 2000, protein_base: 1.6, carbs: 250, fat: 78 };
@@ -114,6 +102,21 @@ const INPUT_STYLE: CSSProperties = {
   transition: "border-color 0.2s, box-shadow 0.2s",
 };
 
+const navStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 4,
+  color: "#94a3b8",
+  textDecoration: "none",
+  flex: 1
+};
+
+const navStyleActive = {
+  ...navStyle,
+  color: "#6366f1"
+};
+
 function focusIn(e: FocusEvent<HTMLInputElement | HTMLSelectElement>): void {
   e.target.style.borderColor = "#6366f1";
   e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)";
@@ -125,31 +128,31 @@ function focusOut(e: FocusEvent<HTMLInputElement | HTMLSelectElement>): void {
 }
 
 // ── Circular Progress Component ──────────────────────────────────────────────
-function CircularProgress({ 
-  value, 
-  total, 
-  label, 
-  size = "lg", 
+function CircularProgress({
+  value,
+  total,
+  label,
+  size = "lg",
   color = "#f97316",
   unit = "g"
-}: { 
-  value: number; 
-  total: number; 
-  label: string; 
+}: {
+  value: number;
+  total: number;
+  label: string;
   size?: "sm" | "lg";
   color?: string;
   unit?: string;
 }) {
   const percent = Math.min((value / total) * 100, 100);
   const stroke = size === "lg" ? 8 : 5;
-  const radius = size === "lg" ? 65 : 45; // Slightly larger small circle for better text fit
+  const radius = size === "lg" ? 65 : 45;
   const normalizedRadius = radius - stroke * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (percent / 100) * circumference;
 
   return (
     <div style={{ position: "relative", width: radius * 2, height: radius * 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg height={radius * 2} width={radius * 2}>
+      <svg height={radius * 2} width={radius * 2} style={{ transform: "rotate(-90deg)" }}>
         <circle
           stroke="#e2e8f0"
           fill="transparent"
@@ -187,22 +190,21 @@ function CircularProgress({
 
 // ── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [food, setFood]               = useState<string>("");
-  const [quantity, setQuantity]       = useState<string>("");
-  const [unit, setUnit]               = useState<string>("g");
-  const [result, setResult]           = useState<LogEntry | null>(null);
-  const [log, setLog]                 = useState<LogEntry[]>([]);
-  const [weight, setWeight]           = useState<string>("70");
-  const [editIndex, setEditIndex]     = useState<number | null>(null);
-  const [error, setError]             = useState<string>("");
+  const [food, setFood] = useState<string>("");
+  const [quantity, setQuantity] = useState<string>("");
+  const [unit, setUnit] = useState<string>("g");
+  const [result, setResult] = useState<LogEntry | null>(null);
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [weight, setWeight] = useState<string>("70");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [error, setError] = useState<string>("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [loading, setLoading]         = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
-  const [activeTab, setActiveTab]     = useState<"today" | "weekly" | "monthly">("today");
+  const [activeTab, setActiveTab] = useState<"today" | "weekly" | "monthly">("today");
 
   const addFormRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Load on start
   useEffect(() => {
     const fetchLog = async () => {
       try {
@@ -219,7 +221,6 @@ export default function App() {
     if (savedWeight) setWeight(savedWeight);
   }, []);
 
-  // ✅ Save weight
   useEffect(() => {
     localStorage.setItem("bodyWeight", weight);
   }, [weight]);
@@ -231,6 +232,7 @@ export default function App() {
     if (!item) return WEIGHT_UNITS;
     if (item.type === "weight") return WEIGHT_UNITS;
     if (item.type === "volume") return VOLUME_UNITS;
+    if (item.type === "unit") return ITEM_UNITS;
     return [];
   };
 
@@ -239,15 +241,21 @@ export default function App() {
     if (val.length > 0) {
       setSuggestions(Object.keys(FOOD_DB).filter(f => f.includes(val.toLowerCase())).slice(0, 5));
     } else { setSuggestions([]); }
+    
+    // Auto-select the right unit type when typing matches
     const key = val.toLowerCase().trim().replace(/\s+/g, "");
     const m = FOOD_DB[key];
-    if (m) { setUnit(m.type === "volume" ? "ml" : "g"); }
+    if (m) { 
+      setUnit(m.type === "volume" ? "ml" : m.type === "unit" ? "Qty" : "g"); 
+    }
   };
 
   const selectSuggestion = (name: string): void => {
     setFood(name); setSuggestions([]);
     const m = FOOD_DB[name];
-    if (m) setUnit(m.type === "volume" ? "ml" : "g");
+    if (m) {
+      setUnit(m.type === "volume" ? "ml" : m.type === "unit" ? "Qty" : "g");
+    }
   };
 
   const calculateItem = (): LogEntry | null => {
@@ -257,22 +265,30 @@ export default function App() {
     setError("");
 
     let calc: { calories: number; protein: number; carbs: number; fat: number };
+    
+    // Fixed Math Logic
     if (item.type === "unit") {
       calc = {
-        calories: item.calories * qty, protein: item.protein * qty,
-        carbs: item.carbs * qty, fat: item.fat * qty,
+        calories: item.calories * qty, 
+        protein: item.protein * qty,
+        carbs: item.carbs * qty, 
+        fat: item.fat * qty,
       };
     } else if (item.type === "weight") {
       const mul = WEIGHT_UNITS.find(u => u.label === unit)?.multiplier || 0;
       calc = {
-        calories: item.calories * qty * mul, protein: item.protein * qty * mul,
-        carbs: item.carbs * qty * mul, fat: item.fat * qty * mul,
+        calories: item.calories * qty * mul, 
+        protein: item.protein * qty * mul,
+        carbs: item.carbs * qty * mul, 
+        fat: item.fat * qty * mul,
       };
     } else {
       const mul = VOLUME_UNITS.find(u => u.label === unit)?.multiplier || 0;
       calc = {
-        calories: item.calories * qty * mul, protein: item.protein * qty * mul,
-        carbs: item.carbs * qty * mul, fat: item.fat * qty * mul,
+        calories: item.calories * qty * mul, 
+        protein: item.protein * qty * mul,
+        carbs: item.carbs * qty * mul, 
+        fat: item.fat * qty * mul,
       };
     }
     return { ...calc, food: itemKey, quantity: qty, unit, type: item.type, timestamp: Date.now() };
@@ -356,11 +372,11 @@ export default function App() {
   };
 
   const totals = log.reduce(
-    (acc, e) => ({
-      calories: acc.calories + e.calories,
-      protein: acc.protein + e.protein,
-      carbs: acc.carbs + e.carbs,
-      fat: acc.fat + e.fat,
+    (acc, { calories = 0, protein = 0, carbs = 0, fat = 0 }) => ({
+      calories: acc.calories + calories,
+      protein: acc.protein + protein,
+      carbs: acc.carbs + carbs,
+      fat: acc.fat + fat,
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
@@ -384,7 +400,7 @@ export default function App() {
       background: "#fff",
       minHeight: "100vh",
       position: "relative",
-      paddingBottom: 100,
+      paddingBottom: 120, // Increased padding to prevent overlap with floating nav
       fontFamily: "'Inter', sans-serif",
       boxShadow: "0 0 40px rgba(0,0,0,0.05)",
       overflowX: "hidden"
@@ -427,13 +443,9 @@ export default function App() {
           gap: 16
         }}>
           <div style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center" }}>
-            
             <CircularProgress value={totals.protein} total={proteinGoal} label="Protein" size="sm" color="#6366f1" unit="g" />
-
             <CircularProgress value={totals.calories} total={caloriesGoal} label="Calories" size="lg" color="#f97316" unit="kcal" />
-
             <CircularProgress value={totals.carbs} total={carbsGoal} label="Carbs" size="sm" color="#10b981" unit="g" />
-
           </div>
 
           <div style={{ width: "100%", height: 1.5, background: "#f1f5f9" }} />
@@ -485,10 +497,11 @@ export default function App() {
       <div style={{ padding: "20px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1e293b", margin: 0 }}>Daily Log</h2>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link href="/logs" style={{ color: "#6366f1", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>View All</Link>
-            <button onClick={clearAllLogs} style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear All</button>
-          </div>
+          {log.length > 0 && (
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={clearAllLogs} style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear All</button>
+            </div>
+          )}
         </div>
 
         {log.length === 0 ? (
@@ -519,7 +532,9 @@ export default function App() {
                     <div style={{ fontSize: 24 }}>{FOOD_DB[entry.food.toLowerCase()]?.emoji || "🍽️"}</div>
                     <div>
                       <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0, textTransform: "capitalize" }}>{entry.food}</p>
-                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>{entry.quantity}{entry.unit} · {entry.calories.toFixed(0)} kcal</p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>
+                        {entry.quantity} {entry.unit} · {entry.calories.toFixed(0)} kcal
+                      </p>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 2 }}>
@@ -610,7 +625,6 @@ export default function App() {
 
             {error && <p style={{ color: "#ef4444", fontSize: 12, margin: 0, fontWeight: 600 }}>{error}</p>}
 
-            {/* Preview Results if any */}
             {result && (
               <div style={{ background: "#f0f4ff", padding: 12, borderRadius: 12, display: "flex", justifyContent: "space-between" }}>
                 <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>Preview: {result.calories.toFixed(0)} kcal</div>
@@ -636,66 +650,65 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Bottom Navigation ── */}
+      {/* ── Floating Bottom Navigation ── */}
       <div style={{
         position: "fixed",
-        bottom: 0,
+        bottom: 24,
         left: "50%",
         transform: "translateX(-50%)",
-        width: "100%",
-        maxWidth: 420,
+        width: "calc(100% - 48px)",
+        maxWidth: 372,
         background: "#fff",
-        borderTop: "1px solid #f1f5f9",
+        borderRadius: 30,
+        boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
         display: "flex",
-        justifyContent: "space-around",
-        padding: "16px 0",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "12px 24px",
         zIndex: 100,
-        boxShadow: "0 -2px 10px rgba(0,0,0,0.02)"
+        boxSizing: "border-box"
       }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#6366f1" }}>
+        <Link href="/" style={navStyleActive}>
           <Home size={22} />
-          <span style={{ fontSize: 10, fontWeight: 700 }}>Home</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+          <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Home</span>
+        </Link>
+
+        <Link href="/logs" style={navStyle}>
           <Utensils size={22} />
-          <span style={{ fontSize: 10, fontWeight: 700 }}>Log</span>
+          <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Log</span>
+        </Link>
+
+        <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+          <button 
+            onClick={() => setShowAddForm(true)}
+            style={{
+              background: "#f97316",
+              color: "#fff",
+              border: "none",
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              transform: "translateY(-20px)",
+              boxShadow: "0 8px 20px rgba(249,115,22,0.3)",
+              cursor: "pointer",
+              transition: "transform 0.2s"
+            }}
+          >
+            <Plus size={24} />
+          </button>
         </div>
 
-        {/* Floating Action Button */}
-        <button
-          onClick={() => setShowAddForm(true)}
-          style={{
-            position: "absolute",
-            top: -24,
-            width: 50,
-            height: 50,
-            borderRadius: "50%",
-            background: "#f97316",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            boxShadow: "0 6px 16px rgba(249,115,22,0.4)",
-            cursor: "pointer",
-            transition: "transform 0.2s"
-          }}
-          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.transform = "scale(1.05)"}
-          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.transform = "scale(1)"}
-        >
-          <Plus size={24} />
-        </button>
-
-        <div style={{ width: 50 }} /> {/* Spacer for FAB */}
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+        <Link href="/stats" style={navStyle}>
           <BarChart2 size={22} />
-          <span style={{ fontSize: 10, fontWeight: 700 }}>Stats</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+          <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Stats</span>
+        </Link>
+        <Link href="/profile" style={navStyle}>
           <User size={22} />
-          <span style={{ fontSize: 10, fontWeight: 700 }}>Profile</span>
-        </div>
+          <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Profile</span>
+        </Link>
       </div>
 
       <style>{`
