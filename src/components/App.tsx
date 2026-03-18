@@ -744,7 +744,18 @@ export default function App() {
                   {log.length} item{log.length > 1 ? "s" : ""}
                 </span>
               </p>
-              <button onClick={() => setLog([])}
+              <button onClick={async () => {
+                  try {
+                    await fetch("/api/food", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({}),
+                    });
+                  } catch (err) {
+                    console.error("Failed to clear food log:", err);
+                  }
+                  setLog([]);
+                }}
                 style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: "4px 8px", borderRadius: 6, transition: "color 0.2s" }}
                 onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.color = "#ef4444"}
                 onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.color = "#94a3b8"}

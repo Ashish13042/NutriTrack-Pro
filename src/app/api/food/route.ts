@@ -18,7 +18,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { id } = await req.json();
-  data = data.filter(item => item.id !== id);
+  const body = await req.json();
+  if (body.id !== undefined) {
+    // Delete a single item by id
+    data = data.filter(item => item.id !== body.id);
+  } else {
+    // No id provided — clear all items
+    data = [];
+  }
   return NextResponse.json({ success: true });
 }
