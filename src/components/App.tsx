@@ -1,6 +1,21 @@
 "use client";
 
-import { useState, useEffect, CSSProperties, FocusEvent, MouseEvent } from "react";
+import { useState, useEffect, CSSProperties, FocusEvent, MouseEvent, useRef } from "react";
+import { 
+  Plus, 
+  Home, 
+  Utensils, 
+  BarChart2, 
+  User, 
+  Search, 
+  Trash2, 
+  Edit3, 
+  ChevronRight,
+  Flame,
+  Dumbbell,
+  Zap,
+  Droplets
+} from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 interface FoodItem {
@@ -24,7 +39,7 @@ interface MacroInfo {
   unit: string;
   color: string;
   bg: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 interface LogEntry {
@@ -37,10 +52,10 @@ interface LogEntry {
   quantity: number;
   unit: string;
   type: "weight" | "volume" | "unit";
+  timestamp?: number;
 }
 
 // ── Food Database ───────────────────────────────────────────────────────────
-// Per-100g for weight/volume, per-piece for unit-type foods
 const FOOD_DB: Record<string, FoodItem> = {
   chicken:      { calories: 165, protein: 31,   carbs: 0,    fat: 3.6,  emoji: "🍗", category: "Protein", type: "weight" },
   egg:          { calories: 78,  protein: 6,    carbs: 0.6,  fat: 5,    emoji: "🥚", category: "Protein", type: "unit"   },
@@ -75,10 +90,10 @@ const VOLUME_UNITS: UnitOption[] = [
 ];
 
 const MACROS: MacroInfo[] = [
-  { key: "calories", label: "Calories", unit: "kcal", color: "#f59e0b", bg: "#fffbeb", icon: "🔥" },
-  { key: "protein",  label: "Protein",  unit: "g",    color: "#6366f1", bg: "#eef2ff", icon: "💪" },
-  { key: "carbs",    label: "Carbs",    unit: "g",    color: "#10b981", bg: "#ecfdf5", icon: "⚡" },
-  { key: "fat",      label: "Fat",      unit: "g",    color: "#ec4899", bg: "#fdf2f8", icon: "🫧" },
+  { key: "calories", label: "Calories", unit: "kcal", color: "#f59e0b", bg: "#fffbeb", icon: <Flame size={14} /> },
+  { key: "protein",  label: "Protein",  unit: "g",    color: "#6366f1", bg: "#eef2ff", icon: <Dumbbell size={14} /> },
+  { key: "carbs",    label: "Carbs",    unit: "g",    color: "#10b981", bg: "#ecfdf5", icon: <Zap size={14} /> },
+  { key: "fat",      label: "Fat",      unit: "g",    color: "#ec4899", bg: "#fdf2f8", icon: <Droplets size={14} /> },
 ];
 
 const DAILY_REF: Record<string, number> = { calories: 2000, protein: 50, carbs: 275, fat: 78 };
@@ -108,86 +123,41 @@ function focusOut(e: FocusEvent<HTMLInputElement | HTMLSelectElement>): void {
   e.target.style.boxShadow = "none";
 }
 
-// ── MacroCard ───────────────────────────────────────────────────────────────
-interface MacroCardProps {
-  macro: MacroInfo;
-  value: number;
-  goalOverride?: number;
-}
-
-function MacroCard({ macro, value, goalOverride }: MacroCardProps) {
-  const ref = goalOverride ?? DAILY_REF[macro.key];
-  const pct = ref > 0 ? Math.min((value / ref) * 100, 100) : 0;
-  return (
-    <div style={{
-      background: macro.bg, border: `1.5px solid ${macro.color}22`, borderRadius: 14,
-      padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8,
-      animation: "fadeInUp 0.4s ease both",
-    }}>
-      <span style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 5, fontWeight: 500 }}>
-        {macro.icon} {macro.label}
-      </span>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: macro.color }}>{value}</span>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>{macro.unit}</span>
-      </div>
-      <div style={{ height: 5, background: `${macro.color}22`, borderRadius: 99, overflow: "hidden" }}>
-        <div style={{
-          height: "100%", width: `${pct}%`, background: macro.color, borderRadius: 99,
-          transition: "width 0.8s cubic-bezier(0.34,1.56,0.64,1)",
-        }} />
-      </div>
-      <span style={{ fontSize: 10, color: "#94a3b8" }}>
-        {pct.toFixed(0)}% of {goalOverride ? "protein goal" : `daily ${macro.label === "Calories" ? "goal" : "intake"}`}
-      </span>
-    </div>
-  );
-}
-
-// ── LogItem ─────────────────────────────────────────────────────────────────
-interface LogItemProps {
-  entry: LogEntry;
-  onRemove: () => void;
-  onEdit: () => void;
-}
-
-function LogItem({ entry, onRemove, onEdit }: LogItemProps) {
-  const emoji = FOOD_DB[entry.food.toLowerCase()]?.emoji || "🍽️";
-  const qtyLabel = entry.type === "unit"
-    ? `${entry.quantity} ${entry.quantity > 1 ? "pcs" : "pc"}`
-    : `${entry.quantity} ${entry.unit}`;
+// ── Circular Progress Component ──────────────────────────────────────────────
+function CircularProgress({ value, total, label }: { value: number; total: number; label: string }) {
+  const percent = Math.min((value / total) * 100, 100);
+  const stroke = 8;
+  const radius = 70;
+  const normalizedRadius = radius - stroke * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
 
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0",
-      borderRadius: 10, animation: "fadeInUp 0.3s ease both",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 20 }}>{emoji}</span>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {entry.food}
-          </p>
-          <p style={{ fontSize: 11, color: "#94a3b8" }}>
-            {qtyLabel} · {entry.calories.toFixed(1)} kcal
-          </p>
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: "#64748b", flexShrink: 0 }}>
-        <span>P:{entry.protein.toFixed(1)}g</span>
-        <span>C:{entry.carbs.toFixed(1)}g</span>
-        <span>F:{entry.fat.toFixed(1)}g</span>
-        <button onClick={onEdit} title="Edit"
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "2px 6px", borderRadius: 6, color: "#6366f1" }}
-          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => (e.target as HTMLElement).style.background = "#eef2ff"}
-          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => (e.target as HTMLElement).style.background = "none"}
-        >✎</button>
-        <button onClick={onRemove} title="Remove"
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "2px 6px", borderRadius: 6, color: "#ef4444" }}
-          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => (e.target as HTMLElement).style.background = "#fee2e2"}
-          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => (e.target as HTMLElement).style.background = "none"}
-        >✕</button>
+    <div style={{ position: "relative", width: radius * 2, height: radius * 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg height={radius * 2} width={radius * 2}>
+        <circle
+          stroke="#e2e8f0"
+          fill="transparent"
+          strokeWidth={stroke}
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
+        />
+        <circle
+          stroke="#f97316"
+          fill="transparent"
+          strokeWidth={stroke}
+          strokeDasharray={circumference + " " + circumference}
+          style={{ strokeDashoffset, transition: "stroke-dashoffset 0.5s ease" }}
+          strokeLinecap="round"
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
+        />
+      </svg>
+      <div style={{ position: "absolute", textAlign: "center" }}>
+        <p style={{ fontSize: 28, fontWeight: 800, color: "#1e293b", margin: 0 }}>{Math.max(0, total - value).toFixed(0)}</p>
+        <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{label}</p>
       </div>
     </div>
   );
@@ -205,6 +175,10 @@ export default function App() {
   const [error, setError]             = useState<string>("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading]         = useState<boolean>(false);
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [activeTab, setActiveTab]     = useState<"today" | "weekly" | "monthly">("today");
+
+  const addFormRef = useRef<HTMLDivElement>(null);
 
   // ✅ Load on start
   useEffect(() => {
@@ -212,7 +186,7 @@ export default function App() {
       try {
         const res = await fetch("/api/food");
         const data = await res.json();
-        setLog(data);
+        setLog(data.map((item: LogEntry) => ({ ...item, timestamp: item.timestamp || Date.now() })));
       } catch (err) {
         console.error("Failed to fetch food log:", err);
       }
@@ -255,9 +229,9 @@ export default function App() {
   };
 
   const calculateItem = (): LogEntry | null => {
-    if (!item) { setError(`"${food}" not found. Try: chicken, egg, milk, rice…`); return null; }
+    if (!item) { setError(`"${food}" not found. Try: chicken, egg…`); return null; }
     const qty = parseFloat(quantity);
-    if (!qty || qty <= 0) { setError("Please enter a valid quantity."); return null; }
+    if (!qty || qty <= 0) { setError("Enter a valid quantity."); return null; }
     setError("");
 
     let calc: { calories: number; protein: number; carbs: number; fat: number };
@@ -279,7 +253,7 @@ export default function App() {
         carbs: item.carbs * qty * mul, fat: item.fat * qty * mul,
       };
     }
-    return { ...calc, food: itemKey, quantity: qty, unit, type: item.type };
+    return { ...calc, food: itemKey, quantity: qty, unit, type: item.type, timestamp: Date.now() };
   };
 
   const handleCalculate = (): void => {
@@ -306,15 +280,14 @@ export default function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(res),
         });
-        // Re-fetch to get the entry with server-assigned id
         const fetchRes = await fetch("/api/food");
         const data = await fetchRes.json();
-        setLog(data);
+        setLog(data.map((item: LogEntry) => ({ ...item, timestamp: item.timestamp || Date.now() })));
       } catch (err) {
         console.error("Failed to add food:", err);
       }
     }
-    setResult(null); setFood(""); setQuantity("");
+    setResult(null); setFood(""); setQuantity(""); setShowAddForm(false);
   };
 
   const editItem = (index: number): void => {
@@ -324,6 +297,8 @@ export default function App() {
     setUnit(e.unit);
     setEditIndex(index);
     setResult(null);
+    setShowAddForm(true);
+    setTimeout(() => addFormRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
   const removeItem = async (i: number): Promise<void> => {
@@ -337,13 +312,10 @@ export default function App() {
         });
         const fetchRes = await fetch("/api/food");
         const data = await fetchRes.json();
-        setLog(data);
+        setLog(data.map((item: LogEntry) => ({ ...item, timestamp: item.timestamp || Date.now() })));
       } catch (err) {
         console.error("Failed to remove food:", err);
-        setLog(prev => prev.filter((_, idx) => idx !== i));
       }
-    } else {
-      setLog(prev => prev.filter((_, idx) => idx !== i));
     }
   };
 
@@ -358,428 +330,347 @@ export default function App() {
   );
 
   const proteinGoal = weight ? parseFloat(weight) * 1.6 : 0;
-  const proteinProgress = proteinGoal ? Math.min((totals.protein / proteinGoal) * 100, 100) : 0;
-
-  const popularFoods = ["chicken", "egg", "rice", "milk", "banana", "roti"];
   const unitList = getUnits();
 
-  const getQtyPlaceholder = (): string => {
-    if (!item) return "Enter quantity";
-    if (item.type === "unit") return `How many? (e.g. 4 ${itemKey}s)`;
-    if (item.type === "volume") return "Amount in ml";
-    return "Weight in g";
+  const getFormattedTime = (timestamp?: number) => {
+    const date = timestamp ? new Date(timestamp) : new Date();
+    return `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
   };
 
   return (
     <div style={{
+      maxWidth: 420,
+      margin: "0 auto",
+      background: "#fff",
       minHeight: "100vh",
-      background: "linear-gradient(160deg, #f0f4ff 0%, #faf5ff 60%, #f0f9ff 100%)",
-      display: "flex", justifyContent: "center",
-      padding: "36px 16px 72px",
+      position: "relative",
+      paddingBottom: 100,
       fontFamily: "'Inter', sans-serif",
+      boxShadow: "0 0 40px rgba(0,0,0,0.05)",
+      overflowX: "hidden"
     }}>
-      {/* Decorative blobs */}
-      <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        <div style={{ position: "absolute", top: "-10%", right: "-5%", width: 500, height: 500, background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)", borderRadius: "50%" }} />
-        <div style={{ position: "absolute", bottom: "-10%", left: "-5%", width: 400, height: 400, background: "radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)", borderRadius: "50%" }} />
+      {/* ── Top Tabs ── */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "20px 16px 10px" }}>
+        {(["today", "weekly", "monthly"] as const).map(tab => (
+          <button 
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 20,
+              fontSize: 13,
+              fontWeight: 600,
+              border: "none",
+              textTransform: "capitalize",
+              background: activeTab === tab ? "#f8fafc" : "transparent",
+              color: activeTab === tab ? "#6366f1" : "#94a3b8",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      <div style={{ width: "100%", maxWidth: 540, position: "relative", zIndex: 1 }}>
-
-        {/* ── Header ── */}
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "rgba(99,102,241,0.08)", border: "1.5px solid rgba(99,102,241,0.2)",
-            borderRadius: 99, padding: "5px 16px", marginBottom: 14,
-          }}>
-            <span style={{ fontSize: 13, color: "#6366f1", fontWeight: 700 }}>🥦 NutriTrack Pro</span>
-          </div>
-          <h1 style={{
-            fontSize: 30, fontWeight: 800, lineHeight: 1.2, marginBottom: 8,
-            background: "linear-gradient(135deg, #1e293b 0%, #6366f1 100%)",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          }}>
-            Smart Nutrition Calculator
-          </h1>
-          <p style={{ color: "#64748b", fontSize: 14 }}>
-            Track your macros &amp; hit your protein goal every day
-          </p>
-        </div>
-
-        {/* ── Body Weight Card ── */}
+      {/* ── Dashboard Card ── */}
+      <div style={{ padding: "10px 20px" }}>
         <div style={{
-          background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 16,
-          padding: "16px 20px", marginBottom: 14,
-          boxShadow: "0 2px 12px rgba(99,102,241,0.05)",
-          animation: "fadeInUp 0.4s ease both",
-          display: "flex", alignItems: "center", gap: 14,
+          background: "#fff",
+          borderRadius: 24,
+          padding: 24,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+          border: "1px solid #f1f5f9",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 20
         }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center",
-            justifyContent: "center", background: "#eef2ff", fontSize: 18, flexShrink: 0,
-          }}>🏋️</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <label style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 }}>
-              Body Weight (kg)
-            </label>
-            <input
-              type="number"
-              placeholder="e.g. 70"
-              value={weight}
+          <div style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ textAlign: "center", flex: 1 }}>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.protein.toFixed(0)}</p>
+              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>Protein</p>
+            </div>
+            
+            <CircularProgress value={totals.calories} total={DAILY_REF.calories} label="Remaining" />
+
+            <div style={{ textAlign: "center", flex: 1 }}>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.carbs.toFixed(0)}</p>
+              <p style={{ fontSize: 10, color: "#94a3b8", margin: 0, fontWeight: 600, textTransform: "uppercase" }}>Carbs</p>
+            </div>
+          </div>
+
+          <div style={{ width: "100%", height: 1.5, background: "#f1f5f9" }} />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", width: "100%", gap: 20 }}>
+             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", color: "#f59e0b" }}>
+                  <Flame size={18} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.calories.toFixed(0)}</p>
+                  <p style={{ fontSize: 10, color: "#94a3b8", margin: 0 }}>Calories burned</p>
+                </div>
+             </div>
+             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fdf2f8", display: "flex", alignItems: "center", justifyContent: "center", color: "#ec4899" }}>
+                  <Droplets size={18} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0 }}>{totals.fat.toFixed(0)}</p>
+                  <p style={{ fontSize: 10, color: "#94a3b8", margin: 0 }}>Fat consumed</p>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body Weight Quick Settings ── */}
+      <div style={{ padding: "0 20px", marginTop: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px 16px", borderRadius: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 18 }}>⚖️</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Body Weight</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input 
+              type="number" 
+              value={weight} 
               onChange={e => setWeight(e.target.value)}
-              style={{
-                ...INPUT_STYLE, padding: "8px 12px", fontSize: 16, fontWeight: 600,
-                border: "none", background: "transparent",
-              }}
-              onFocus={(e: FocusEvent<HTMLInputElement>) => { e.target.style.background = "#f8fafc"; }}
-              onBlur={(e: FocusEvent<HTMLInputElement>) => { e.target.style.background = "transparent"; }}
+              placeholder="0"
+              style={{ width: 40, background: "transparent", border: "none", textAlign: "right", fontWeight: 700, fontSize: 14, color: "#6366f1", outline: "none" }}
             />
+            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>KG</span>
           </div>
-          {Number(weight) > 0 && (
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>Protein Goal</p>
-              <p style={{ fontSize: 16, fontWeight: 700, color: "#6366f1" }}>{proteinGoal.toFixed(0)}g</p>
-              <p style={{ fontSize: 9, color: "#94a3b8" }}>1.6 × body weight</p>
-            </div>
-          )}
+        </div>
+      </div>
+
+      {/* ── Food Log Timeline ── */}
+      <div style={{ padding: "24px 20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1e293b", margin: 0 }}>Daily Log</h2>
+          <button style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>View All</button>
         </div>
 
-        {/* ── Input Card ── */}
-        <div style={{
-          background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20,
-          padding: 24, marginBottom: 16,
-          boxShadow: "0 4px 24px rgba(99,102,241,0.07), 0 1px 4px rgba(0,0,0,0.04)",
-          animation: "fadeInUp 0.5s ease both",
-        }}>
-          {/* Editing indicator */}
-          {editIndex !== null && (
-            <div style={{
-              background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 10,
-              padding: "8px 14px", marginBottom: 14, display: "flex", alignItems: "center",
-              justifyContent: "space-between", fontSize: 13,
-            }}>
-              <span style={{ color: "#92400e", fontWeight: 600 }}>✏️ Editing item #{editIndex + 1}</span>
-              <button
-                onClick={() => { setEditIndex(null); setFood(""); setQuantity(""); setResult(null); }}
-                style={{ background: "none", border: "none", color: "#92400e", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}
-              >Cancel</button>
-            </div>
-          )}
+        {log.length === 0 ? (
+          <div style={{ padding: "40px 0", textAlign: "center", color: "#94a3b8" }}>
+            <p style={{ fontSize: 14 }}>No food logged yet today.</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {log.map((entry, i) => (
+              <div key={i} style={{ display: "flex", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 40 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8" }}>{getFormattedTime(entry.timestamp)}</span>
+                  <div style={{ flex: 1, width: 2, background: i === log.length - 1 ? "transparent" : "#f1f5f9", margin: "4px 0" }} />
+                </div>
+                
+                <div style={{ 
+                  flex: 1, 
+                  background: "#f8fafc", 
+                  borderRadius: 16, 
+                  padding: "12px 16px", 
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  border: "1px solid #f1f5f9"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ fontSize: 24 }}>{FOOD_DB[entry.food.toLowerCase()]?.emoji || "🍽️"}</div>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0, textTransform: "capitalize" }}>{entry.food}</p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>{entry.quantity}{entry.unit} · {entry.calories.toFixed(0)} kcal</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    <button onClick={() => editItem(i)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 6 }}>
+                      <Edit3 size={16} />
+                    </button>
+                    <button onClick={() => removeItem(i)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: 6 }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-          <p style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 18 }}>
-            {editIndex !== null ? "Edit Food Item" : "Add Food Item"}
-          </p>
+      {/* ── Add Food Form (Conditional Overlay) ── */}
+      {showAddForm && (
+        <div 
+          ref={addFormRef}
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "100%",
+            maxWidth: 420,
+            background: "#fff",
+            zIndex: 200,
+            borderTopLeftRadius: 30,
+            borderTopRightRadius: 30,
+            padding: 24,
+            boxShadow: "0 -10px 40px rgba(0,0,0,0.1)",
+            animation: "slideUp 0.3s ease-out"
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{editIndex !== null ? "Edit Item" : "Add Food"}</h3>
+            <button 
+              onClick={() => { setShowAddForm(false); setEditIndex(null); setFood(""); setQuantity(""); setResult(null); }}
+              style={{ background: "#f1f5f9", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            >
+              <Plus size={18} style={{ transform: "rotate(45deg)", color: "#64748b" }} />
+            </button>
+          </div>
 
-          {/* Food Name */}
-          <div style={{ position: "relative", marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6, fontWeight: 600 }}>
-              Food Name
-            </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Food Name */}
             <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 17, pointerEvents: "none", lineHeight: 1 }}>
-                {item?.emoji || "🍽️"}
-              </span>
+              <Search size={16} style={{ position: "absolute", left: 14, top: 16, color: "#94a3b8" }} />
               <input
                 type="text"
-                placeholder="e.g. chicken, egg, milk…"
+                placeholder="Search food (chicken, egg...)"
                 value={food}
                 onChange={e => handleFoodChange(e.target.value)}
-                onBlur={() => setTimeout(() => setSuggestions([]), 150)}
-                style={{ ...INPUT_STYLE, paddingLeft: 42, borderColor: error ? "#ef4444" : "#e2e8f0" }}
+                style={{ ...INPUT_STYLE, paddingLeft: 40 }}
                 onFocus={focusIn}
-                onBlurCapture={(e: FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = error ? "#ef4444" : "#e2e8f0"; e.target.style.boxShadow = "none"; }}
+                onBlur={focusOut}
               />
+              {suggestions.length > 0 && (
+                <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", zIndex: 10, boxShadow: "0 -4px 12px rgba(0,0,0,0.05)", marginBottom: 8 }}>
+                   {suggestions.map(s => (
+                     <div key={s} onClick={() => selectSuggestion(s)} style={{ padding: "10px 14px", fontSize: 14, cursor: "pointer", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between" }}>
+                        <span>{FOOD_DB[s].emoji} {s}</span>
+                        <ChevronRight size={14} color="#94a3b8" />
+                     </div>
+                   ))}
+                </div>
+              )}
             </div>
 
-            {/* Type Badge */}
-            {item && (
-              <span style={{
-                display: "inline-block", marginTop: 6, fontSize: 11, fontWeight: 600,
-                color: item.type === "unit" ? "#f59e0b" : item.type === "volume" ? "#3b82f6" : "#10b981",
-                background: item.type === "unit" ? "#fffbeb" : item.type === "volume" ? "#eff6ff" : "#ecfdf5",
-                border: `1px solid ${item.type === "unit" ? "#fde68a" : item.type === "volume" ? "#bfdbfe" : "#a7f3d0"}`,
-                padding: "2px 10px", borderRadius: 99,
-              }}>
-                {item.type === "unit" ? "🔢 Count-based" : item.type === "volume" ? "💧 Volume-based" : "⚖️ Weight-based"}
-              </span>
-            )}
-
-            {/* Suggestions */}
-            {suggestions.length > 0 && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12,
-                overflow: "hidden", zIndex: 50, boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-              }}>
-                {suggestions.map(s => (
-                  <button key={s} onMouseDown={() => selectSuggestion(s)}
-                    style={{
-                      width: "100%", textAlign: "left", background: "none", border: "none",
-                      padding: "10px 14px", color: "#1e293b", fontSize: 14,
-                      display: "flex", alignItems: "center", gap: 10,
-                      cursor: "pointer", transition: "background 0.15s", borderBottom: "1px solid #f1f5f9",
-                    }}
-                    onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.background = "#f0f4ff"}
-                    onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.background = "none"}
-                  >
-                    <span>{FOOD_DB[s].emoji}</span>
-                    <span style={{ textTransform: "capitalize", fontWeight: 500 }}>{s}</span>
-                    <span style={{
-                      marginLeft: "auto", fontSize: 10, fontWeight: 600,
-                      color: FOOD_DB[s].type === "unit" ? "#f59e0b" : FOOD_DB[s].type === "volume" ? "#3b82f6" : "#10b981",
-                      background: FOOD_DB[s].type === "unit" ? "#fffbeb" : FOOD_DB[s].type === "volume" ? "#eff6ff" : "#ecfdf5",
-                      padding: "2px 8px", borderRadius: 99,
-                    }}>{FOOD_DB[s].type}</span>
-                    <span style={{ fontSize: 10, color: "#6366f1", background: "#eef2ff", padding: "2px 8px", borderRadius: 99, fontWeight: 500 }}>
-                      {FOOD_DB[s].category}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quantity + Unit */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-            <div style={{ flex: unitList.length > 0 ? "0 0 130px" : "1 1 auto" }}>
-              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6, fontWeight: 600 }}>
-                {item?.type === "unit" ? "Count" : "Quantity"}
-              </label>
+            {/* Quantity Row */}
+            <div style={{ display: "flex", gap: 10 }}>
               <input
-                type="number" min="1"
-                placeholder={getQtyPlaceholder()}
+                type="number"
+                placeholder="Quantity"
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
-                style={INPUT_STYLE} onFocus={focusIn} onBlur={focusOut}
+                style={{ ...INPUT_STYLE, flex: 2 }}
+                onFocus={focusIn}
+                onBlur={focusOut}
               />
-            </div>
-            {unitList.length > 0 && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6, fontWeight: 600 }}>Unit</label>
-                <select value={unit} onChange={e => setUnit(e.target.value)}
-                  style={{
-                    ...INPUT_STYLE, padding: "11px 30px 11px 12px", appearance: "none", cursor: "pointer",
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", backgroundSize: 15,
-                  }}
-                  onFocus={focusIn} onBlur={focusOut}
-                >
+              {unitList.length > 0 && (
+                <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...INPUT_STYLE, flex: 1 }}>
                   {unitList.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
                 </select>
-              </div>
-            )}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div style={{
-              background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 10,
-              padding: "10px 14px", fontSize: 13, color: "#b91c1c", marginBottom: 14,
-              display: "flex", alignItems: "center", gap: 8,
-            }}>⚠️ {error}</div>
-          )}
-
-          {/* Popular Foods */}
-          <div style={{ marginBottom: 18 }}>
-            <p style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 }}>Popular Foods</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {popularFoods.map(f => (
-                <button key={f} onClick={() => { handleFoodChange(f); setSuggestions([]); }}
-                  style={{
-                    background: food.toLowerCase() === f ? "#eef2ff" : "#f8fafc",
-                    border: `1.5px solid ${food.toLowerCase() === f ? "#6366f1" : "#e2e8f0"}`,
-                    borderRadius: 8, padding: "5px 11px", fontSize: 12,
-                    color: food.toLowerCase() === f ? "#6366f1" : "#475569",
-                    cursor: "pointer", fontFamily: "inherit", fontWeight: 500,
-                    transition: "all 0.18s", display: "flex", alignItems: "center", gap: 5,
-                  }}
-                  onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => { if (food.toLowerCase() !== f) { e.currentTarget.style.borderColor = "#6366f1"; e.currentTarget.style.color = "#6366f1"; }}}
-                  onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => { if (food.toLowerCase() !== f) { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.color = "#475569"; }}}
-                >
-                  {FOOD_DB[f].emoji} {f}
-                </button>
-              ))}
+              )}
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={handleCalculate} disabled={loading}
-              style={{
-                flex: 1, background: loading ? "#e2e8f0" : "#f8fafc",
-                border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "13px",
-                color: loading ? "#94a3b8" : "#1e293b", fontSize: 14, fontWeight: 600,
-                cursor: loading ? "not-allowed" : "pointer",
-                display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
-                fontFamily: "inherit", transition: "all 0.2s",
-              }}
-              onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => { if (!loading) { e.currentTarget.style.borderColor = "#6366f1"; e.currentTarget.style.color = "#6366f1"; }}}
-              onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => { if (!loading) { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.color = "#1e293b"; }}}
-            >
-              {loading
-                ? <><span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #c7d2fe", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Calculating…</>
-                : "🔍 Preview"}
-            </button>
-            <button onClick={addOrUpdate}
-              style={{
-                flex: 1,
-                background: editIndex !== null ? "linear-gradient(135deg, #f59e0b, #f97316)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                border: "none", borderRadius: 12, padding: "13px",
-                color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
-                display: "flex", justifyContent: "center", alignItems: "center", gap: 6,
-                fontFamily: "inherit",
-                boxShadow: editIndex !== null ? "0 4px 16px rgba(245,158,11,0.35)" : "0 4px 16px rgba(99,102,241,0.35)",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.boxShadow = editIndex !== null ? "0 6px 22px rgba(245,158,11,0.5)" : "0 6px 22px rgba(99,102,241,0.5)"}
-              onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.boxShadow = editIndex !== null ? "0 4px 16px rgba(245,158,11,0.35)" : "0 4px 16px rgba(99,102,241,0.35)"}
-            >
-              {editIndex !== null ? "✏️ Update Food" : "✨ Add Food"}
-            </button>
+            {error && <p style={{ color: "#ef4444", fontSize: 12, margin: 0, fontWeight: 600 }}>{error}</p>}
+
+            {/* Preview Results if any */}
+            {result && (
+               <div style={{ background: "#f0f4ff", padding: 12, borderRadius: 12, display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>Preview: {result.calories.toFixed(0)} kcal</div>
+                  <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 700 }}>P: {result.protein.toFixed(1)}g</div>
+               </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button 
+                onClick={handleCalculate}
+                style={{ flex: 1, padding: 14, borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontWeight: 700, cursor: "pointer" }}
+              >
+                Preview
+              </button>
+              <button 
+                onClick={addOrUpdate}
+                style={{ flex: 1, padding: 14, borderRadius: 12, border: "none", background: "#f97316", color: "#fff", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(249,115,22,0.3)" }}
+              >
+                {editIndex !== null ? "Update" : "Add to Log"}
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* ── Preview Result ── */}
-        {result && (
-          <div style={{
-            background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20,
-            padding: 24, marginBottom: 16,
-            boxShadow: "0 4px 24px rgba(99,102,241,0.09)",
-            animation: "fadeInUp 0.4s ease both",
-          }}>
-            <p style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600, marginBottom: 4 }}>
-              Preview — Nutrition for
-            </p>
-            <p style={{ fontSize: 17, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8, textTransform: "capitalize", marginBottom: 16 }}>
-              {FOOD_DB[result.food]?.emoji} {result.food}
-              <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 400 }}>
-                · {result.type === "unit" ? `${result.quantity} ${result.quantity > 1 ? "pcs" : "pc"}` : `${result.quantity} ${result.unit}`}
-              </span>
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {MACROS.map(m => <MacroCard key={m.key} macro={m} value={+result[m.key].toFixed(1)} />)}
-            </div>
-          </div>
-        )}
+      {/* ── Bottom Navigation ── */}
+      <div style={{
+        position: "fixed",
+        bottom: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "100%",
+        maxWidth: 420,
+        background: "#fff",
+        borderTop: "1px solid #f1f5f9",
+        display: "flex",
+        justifyContent: "space-around",
+        padding: "16px 0",
+        zIndex: 100,
+        boxShadow: "0 -2px 10px rgba(0,0,0,0.02)"
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#6366f1" }}>
+          <Home size={22} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>Home</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+          <Utensils size={22} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>Log</span>
+        </div>
 
-        {/* ── Total Intake ── */}
-        {log.length > 0 && (
-          <div style={{
-            background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20,
-            padding: 24, marginBottom: 16,
-            boxShadow: "0 4px 24px rgba(99,102,241,0.07)",
-            animation: "fadeInUp 0.4s ease both",
-          }}>
-            <p style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>
-              Daily Totals
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-              {MACROS.map(m => (
-                <div key={m.key} style={{ textAlign: "center", background: m.bg, borderRadius: 10, padding: "10px 4px" }}>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{totals[m.key].toFixed(1)}</p>
-                  <p style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{m.label}</p>
-                </div>
-              ))}
-            </div>
+        {/* Floating Action Button */}
+        <button 
+          onClick={() => setShowAddForm(true)}
+          style={{
+            position: "absolute",
+            top: -24,
+            width: 50,
+            height: 50,
+            borderRadius: "50%",
+            background: "#f97316",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            boxShadow: "0 6px 16px rgba(249,115,22,0.4)",
+            cursor: "pointer",
+            transition: "transform 0.2s"
+          }}
+          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.transform = "scale(1.05)"}
+          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.transform = "scale(1)"}
+        >
+          <Plus size={24} />
+        </button>
 
-            {/* Calorie Goal */}
-            <div style={{ marginBottom: weight ? 16 : 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginBottom: 6, fontWeight: 500 }}>
-                <span>Calorie Goal</span>
-                <span>{totals.calories.toFixed(0)} / {DAILY_REF.calories} kcal</span>
-              </div>
-              <div style={{ height: 6, background: "#f1f5f9", borderRadius: 99, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%",
-                  width: `${Math.min((totals.calories / DAILY_REF.calories) * 100, 100)}%`,
-                  background: "linear-gradient(90deg, #6366f1, #f59e0b)",
-                  borderRadius: 99, transition: "width 0.8s ease",
-                }} />
-              </div>
-            </div>
+        <div style={{ width: 50 }} /> {/* Spacer for FAB */}
 
-            {/* Protein Goal (only when body weight is entered) */}
-            {proteinGoal > 0 && (
-              <div style={{
-                background: "#eef2ff", border: "1.5px solid #c7d2fe", borderRadius: 12,
-                padding: "14px 16px",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#4338ca", display: "flex", alignItems: "center", gap: 6 }}>
-                    💪 Protein Goal
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#6366f1" }}>
-                    {totals.protein.toFixed(1)} / {proteinGoal.toFixed(0)}g
-                  </span>
-                </div>
-                <div style={{ height: 8, background: "#c7d2fe", borderRadius: 99, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%",
-                    width: `${proteinProgress}%`,
-                    background: proteinProgress >= 100 ? "linear-gradient(90deg, #10b981, #34d399)" : "linear-gradient(90deg, #6366f1, #8b5cf6)",
-                    borderRadius: 99, transition: "width 0.8s ease",
-                  }} />
-                </div>
-                <p style={{ fontSize: 10, color: "#6366f1", marginTop: 6, textAlign: "right" }}>
-                  {proteinProgress >= 100 ? "✅ Goal reached!" : `${proteinProgress.toFixed(0)}% complete`}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Food Log ── */}
-        {log.length > 0 && (
-          <div style={{
-            background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20,
-            padding: 24,
-            boxShadow: "0 4px 24px rgba(99,102,241,0.07)",
-            animation: "fadeInUp 0.4s ease both",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
-                📋 Food Log
-                <span style={{ background: "#eef2ff", color: "#6366f1", fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600 }}>
-                  {log.length} item{log.length > 1 ? "s" : ""}
-                </span>
-              </p>
-              <button onClick={async () => {
-                  try {
-                    await fetch("/api/food", {
-                      method: "DELETE",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({}),
-                    });
-                  } catch (err) {
-                    console.error("Failed to clear food log:", err);
-                  }
-                  setLog([]);
-                }}
-                style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: "4px 8px", borderRadius: 6, transition: "color 0.2s" }}
-                onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.color = "#ef4444"}
-                onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => e.currentTarget.style.color = "#94a3b8"}
-              >Clear All</button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {log.map((entry, i) => (
-                <LogItem key={i} entry={entry} onRemove={() => removeItem(i)} onEdit={() => editItem(i)} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 24 }}>
-          Nutrition data sourced from USDA · Per-piece for count items, per 100g/100ml otherwise
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+          <BarChart2 size={22} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>Stats</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "#94a3b8" }}>
+          <User size={22} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>Profile</span>
+        </div>
       </div>
 
       <style>{`
-        @keyframes fadeInUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes spin { to { transform:rotate(360deg); } }
-        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
-        select option { background:#fff; color:#1e293b; }
+        @keyframes slideUp {
+          from { transform: translate(-50%, 100%); }
+          to { transform: translate(-50%, 0); }
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
       `}</style>
     </div>
   );
