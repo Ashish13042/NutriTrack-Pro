@@ -69,6 +69,9 @@ const FOOD_DB: Record<string, FoodItem> = {
   spinach: { calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4, emoji: "🥬", category: "Veggies", type: "weight" },
   broccoli: { calories: 34, protein: 2.8, carbs: 7, fat: 0.4, emoji: "🥦", category: "Veggies", type: "weight" },
   apple: { calories: 52, protein: 0.3, carbs: 14, fat: 0.2, emoji: "🍎", category: "Fruit", type: "unit" },
+  daal: { calories: 116, protein: 9, carbs: 20, fat: 0.4, emoji: "🍲", category: "Protein", type: "weight" },
+  soyachunks: { calories: 345, protein: 52, carbs: 33, fat: 0.5, emoji: "🥘", category: "Protein", type: "weight" },
+  curd: { calories: 98, protein: 11, carbs: 3.4, fat: 4.3, emoji: "🥣", category: "Dairy", type: "weight" },
 };
 
 const WEIGHT_UNITS: UnitOption[] = [

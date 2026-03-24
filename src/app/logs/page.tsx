@@ -17,7 +17,8 @@ const FOOD_DB_EMOJI: Record<string, string> = {
   chicken: "🍗", egg: "🥚", tuna: "🐟", salmon: "🐠", beef: "🥩",
   paneer: "🧀", rice: "🍚", bread: "🍞", oats: "🌾", pasta: "🍝",
   banana: "🍌", roti: "🫓", milk: "🥛", yogurt: "🍦", almonds: "🌰",
-  avocado: "🥑", peanutbutter: "🥜", spinach: "🥬", broccoli: "🥦", apple: "🍎"
+  avocado: "🥑", peanutbutter: "🥜", spinach: "🥬", broccoli: "🥦", apple: "🍎",
+  daal: "🍲", soyachunks: "🥘", curd: "🥣"
 };
 
 export default function LogsPage() {
